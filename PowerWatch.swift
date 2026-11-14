@@ -3,6 +3,18 @@ import SwiftUI
 import Combine
 import Darwin
 import Security
+
+func appIsEnglish() -> Bool {
+    let v = UserDefaults.standard.integer(forKey: "PWLanguage")
+    switch v {
+    case 2: return true
+    case 1: return false
+    default:
+        return (Locale.preferredLanguages.first ?? "").hasPrefix("en")
+    }
+}
+
+func L(_ zh: String, _ en: String) -> String { appIsEnglish() ? en : zh }
 import ServiceManagement
 import IOKit
 import IOKit.ps
@@ -635,9 +647,9 @@ final class AICleaner {
                         let freed = max(0, (before.usedGB - after.usedGB) * 1024)
                         var msg: String
                         if killed == 0 {
-                            msg = "AI 判断无需清理"
+                            msg = L("AI 判断无需清理", "AI found nothing to clean")
                         } else {
-                            msg = String(format: "AI 清理 %d 个进程 · 释放约 %.0f MB", killed, freed)
+                            msg = L(String(format: "AI 清理 %d 个进程 · 释放约 %.0f MB", killed, freed), String(format: "AI cleaned %d processes · freed ~%.0f MB", killed, freed))
                         }
                         if !parsed.reason.isEmpty { msg += " · \(parsed.reason)" }
                         DispatchQueue.main.async { completion(.success(msg)) }
@@ -723,7 +735,10 @@ final class PowerModel: ObservableObject {
     @Published var fontLevel: Int {
         didSet { UserDefaults.standard.set(fontLevel, forKey: "PWFont") }
     }
-    @Published var aiStatus: String = "未配置"
+    @Published var language: Int {
+        didSet { UserDefaults.standard.set(language, forKey: "PWLanguage") }
+    }
+    @Published var aiStatus: String = L("未配置", "Not configured")
     @Published var aiCleaning = false
     @Published var aiResult: String? = nil
     @Published var launchAtLogin = false
@@ -750,6 +765,8 @@ final class PowerModel: ObservableObject {
         themeIndex = (0..<PWTheme.all.count).contains(savedTheme) ? savedTheme : 0
         let savedFont = UserDefaults.standard.integer(forKey: "PWFont")
         fontLevel = (1...4).contains(savedFont) ? savedFont : 2
+        let savedLang = UserDefaults.standard.integer(forKey: "PWLanguage")
+        language = (0...2).contains(savedLang) ? savedLang : 0
     }
 }
 
@@ -786,7 +803,7 @@ struct InfoRow: View {
             Text(label)
                 .font(.system(size: 10.5 * sc))
                 .foregroundStyle(th.sub)
-                .frame(width: 78 * sc, alignment: .leading)
+                .frame(width: (appIsEnglish() ? 100 : 78) * sc, alignment: .leading)
             Text(value)
                 .font(.system(size: 12 * sc, weight: .medium, design: .rounded))
                 .monospacedDigit()
@@ -913,7 +930,7 @@ struct PowerChartView: View {
                     }
                     .stroke(th.warn, style: StrokeStyle(lineWidth: 1.2, lineCap: .round, lineJoin: .round))
                 } else {
-                    Text("正在记录… 每分钟一个点")
+                    Text(L("正在记录… 每分钟一个点", "Recording… one point per minute"))
                         .font(.system(size: 9 * sc))
                         .foregroundStyle(th.sub)
                         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -926,7 +943,9 @@ struct PowerChartView: View {
 
 struct PowerCard: View {
     @ObservedObject var model: PowerModel
-    private let tabs = ["电源", "CPU", "内存", "AI", "曲线", "外观"]
+    private var tabs: [String] {
+        [L("电源", "Power"), "CPU", L("内存", "Mem"), "AI", L("曲线", "Curve"), L("外观", "Theme")]
+    }
 
     private var th: PWTheme { PWTheme.all[min(model.themeIndex, PWTheme.all.count - 1)] }
     private var sc: CGFloat {
@@ -990,17 +1009,17 @@ struct PowerCard: View {
                     .font(.system(size: fs(12), weight: .medium))
                     .foregroundStyle(th.sub)
                 Spacer(minLength: 4)
-                if s.adapterWatts > 0 && s.inputW > 1 { GoldChip(text: "\(s.adapterWatts) W 档") }
+                if s.adapterWatts > 0 && s.inputW > 1 { GoldChip(text: L("\(s.adapterWatts) W 档", "\(s.adapterWatts) W")) }
             }
             HStack(spacing: 10) {
-                Text(s.inputW > 1 ? "输入功率 · 进入 Mac" : "电池放电")
+                Text(s.inputW > 1 ? L("输入功率 · 进入 Mac", "Input power") : L("电池放电", "On battery"))
                     .font(.system(size: fs(9.5)))
                     .foregroundStyle(th.sub)
                 Text("CPU \(String(format: "%.0f", model.cpuPct))%")
                     .font(.system(size: fs(9.5), weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(th.text)
-                Text("内存 \(String(format: "%.0f", model.memPct))%")
+                Text(L("内存", "MEM") + " \(String(format: "%.0f", model.memPct))%")
                     .font(.system(size: fs(9.5), weight: .medium, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(th.text)
@@ -1038,42 +1057,42 @@ struct PowerCard: View {
         let s = model.snap
         let identified = s.adapterName != nil || s.adapterSerial != nil
         return VStack(alignment: .leading, spacing: 3 * sc) {
-            InfoRow(label: "电压 × 电流",
+            InfoRow(label: L("电压 × 电流", "Voltage × Current"),
                     value: (s.inputV > 0.1 || s.inputA > 0.01)
                         ? String(format: "%.2f V × %.2f A", s.inputV, s.inputA) : "—",
                     color: s.inputV > 0.1 ? th.text : th.sub)
-            InfoRow(label: "电池",
+            InfoRow(label: L("电池", "Battery"),
                     value: s.batteryW >= 0 ? String(format: "+%.1f W", s.batteryW) : String(format: "%.1f W", s.batteryW),
                     color: s.batteryW >= 0 ? th.accent : th.warn)
-            InfoRow(label: "电池容量", value: capacityText(s), color: th.text)
-            InfoRow(label: "系统负载", value: String(format: "%.1f W", s.loadW))
+            InfoRow(label: L("电池容量", "Capacity"), value: capacityText(s), color: th.text)
+            InfoRow(label: L("系统负载", "System load"), value: String(format: "%.1f W", s.loadW))
             HairLine().padding(.vertical, 1)
 
-            InfoRow(label: "充电器",
-                    value: s.adapterWatts > 0 ? (s.adapterName ?? "未识别（\(s.adapterDesc ?? "PD")）") : "未接电源",
+            InfoRow(label: L("充电器", "Charger"),
+                    value: s.adapterWatts > 0 ? (s.adapterName ?? L("未识别（\(s.adapterDesc ?? "PD")）", "Unrecognized (\(s.adapterDesc ?? "PD"))")) : L("未接电源", "No power"),
                     color: s.adapterWatts > 0 ? (identified ? th.text : th.warn) : th.sub)
             InfoRow(label: "PD",
                     value: s.adapterWatts > 0
                         ? String(format: "%d V × %.2f A · %d W", s.adapterVmV / 1000, Double(s.adapterAmA) / 1000.0, s.adapterWatts)
                         : "—",
                     color: s.adapterWatts > 0 ? th.text : th.sub)
-            InfoRow(label: "认证",
-                    value: s.adapterWatts > 0 ? (identified ? "✅ 原装已识别" : "⚠️ 未识别（第三方/改装）") : "—",
+            InfoRow(label: L("认证", "Auth"),
+                    value: s.adapterWatts > 0 ? (identified ? L("✅ 原装已识别", "✅ Genuine adapter") : L("⚠️ 未识别（第三方/改装）", "⚠️ Unrecognized (3rd-party)")) : "—",
                     color: s.adapterWatts > 0 ? (identified ? th.accent : th.warn) : th.sub)
-            InfoRow(label: "身份", value: identLine(s), color: s.adapterWatts > 0 ? th.text : th.sub)
+            InfoRow(label: L("身份", "Identity"), value: identLine(s), color: s.adapterWatts > 0 ? th.text : th.sub)
             HairLine().padding(.vertical, 1)
 
             HStack {
-                Text("耗电应用")
+                Text(L("耗电应用", "Energy apps"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
-                Text("能源影响")
+                Text(L("能源影响", "Impact"))
                     .font(.system(size: fs(9)))
                     .foregroundStyle(th.sub.opacity(0.7))
             }
             if model.powerList.isEmpty {
-                Text("采样中…")
+                Text(L("采样中…", "Sampling…"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                     .frame(height: 16)
@@ -1089,7 +1108,7 @@ struct PowerCard: View {
     private var cpuTab: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
-                Text("总 CPU 占用")
+                Text(L("总 CPU 占用", "Total CPU"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
@@ -1100,17 +1119,17 @@ struct PowerCard: View {
             }
             RatioBar(ratio: model.cpuPct / 100)
             HStack {
-                Text("进程")
+                Text(L("进程", "Process"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
-                Text("CPU（单核）")
+                Text(L("CPU（单核）", "CPU (per-core)"))
                     .font(.system(size: fs(9)))
                     .foregroundStyle(th.sub.opacity(0.7))
             }
             .padding(.top, 2)
             if model.cpuList.isEmpty {
-                Text("采样中…").font(.system(size: fs(10))).foregroundStyle(th.sub).frame(height: 16)
+                Text(L("采样中…", "Sampling…")).font(.system(size: fs(10))).foregroundStyle(th.sub).frame(height: 16)
             } else {
                 ForEach(Array(model.cpuList.prefix(6))) { p in
                     ProcRow(name: p.name, value: String(format: "%.1f%%", p.value))
@@ -1123,7 +1142,7 @@ struct PowerCard: View {
     private var memTab: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .firstTextBaseline) {
-                Text("内存占用")
+                Text(L("内存占用", "Memory usage"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
@@ -1138,7 +1157,7 @@ struct PowerCard: View {
                     .monospacedDigit()
                     .foregroundStyle(th.text)
                 Spacer()
-                Text(String(format: "可回收 %.1f GB", model.memReclaim))
+                Text(L(String(format: "可回收 %.1f GB", model.memReclaim), String(format: "Reclaimable %.1f GB", model.memReclaim)))
                     .font(.system(size: fs(9), design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(th.sub)
@@ -1151,17 +1170,17 @@ struct PowerCard: View {
                     .lineLimit(2)
             }
             HStack {
-                Text("进程")
+                Text(L("进程", "Process"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
-                Text("内存")
+                Text(L("内存", "Memory"))
                     .font(.system(size: fs(9)))
                     .foregroundStyle(th.sub.opacity(0.7))
             }
             .padding(.top, 2)
             if model.memList.isEmpty {
-                Text("采样中…").font(.system(size: fs(10))).foregroundStyle(th.sub).frame(height: 16)
+                Text(L("采样中…", "Sampling…")).font(.system(size: fs(10))).foregroundStyle(th.sub).frame(height: 16)
             } else {
                 ForEach(Array(model.memList.prefix(6))) { p in
                     ProcRow(name: p.name, value: String(format: "%.2f GB", p.value))
@@ -1174,23 +1193,23 @@ struct PowerCard: View {
     private var aiTab: some View {
         VStack(alignment: .leading, spacing: 7) {
             HStack {
-                Text("AI 清理设置")
+                Text(L("AI 清理设置", "AI cleanup settings"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
                 Text(model.aiStatus)
                     .font(.system(size: fs(9)))
-                    .foregroundStyle(model.aiStatus.contains("失败") ? th.warn : th.accent.opacity(0.85))
+                    .foregroundStyle((model.aiStatus.contains("失败") || model.aiStatus.contains("Failed")) ? th.warn : th.accent.opacity(0.85))
                     .lineLimit(1)
             }
-            configField("接口", text: $model.aiBase)
-            configField("模型", text: $model.aiModel)
-            configField("密钥", text: $model.aiKey, secure: true)
+            configField(L("接口", "Endpoint"), text: $model.aiBase)
+            configField(L("模型", "Model"), text: $model.aiModel)
+            configField(L("密钥", "API key"), text: $model.aiKey, secure: true)
             HStack(spacing: 8) {
-                smallButton("保存") { model.onSaveConfig() }
-                smallButton("测试连接") { model.onTestConfig() }
+                smallButton(L("保存", "Save")) { model.onSaveConfig() }
+                smallButton(L("测试连接", "Test")) { model.onTestConfig() }
                 Spacer()
-                Text("仅上传进程名与占用")
+                Text(L("仅上传进程名与占用", "Names & usage only"))
                     .font(.system(size: fs(8.5)))
                     .foregroundStyle(th.sub.opacity(0.7))
             }
@@ -1208,11 +1227,11 @@ struct PowerCard: View {
         let currentW = model.snap.inputW
         let currentB = model.snap.batteryW
         let batteryText: String = currentB > 0.5
-            ? String(format: "+%.1f W 电池", currentB)
-            : (currentB < -0.5 ? String(format: "%.1f W 放电", currentB) : "0.0 W 电池")
+            ? L(String(format: "+%.1f W 电池", currentB), String(format: "+%.1f W battery", currentB))
+            : (currentB < -0.5 ? L(String(format: "%.1f W 放电", currentB), String(format: "%.1f W discharging", currentB)) : L("0.0 W 电池", "0.0 W battery"))
         return VStack(alignment: .leading, spacing: 6 * sc) {
             HStack {
-                Text("功率曲线")
+                Text(L("功率曲线", "Power curve"))
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
@@ -1235,7 +1254,7 @@ struct PowerCard: View {
                     .font(.system(size: fs(19), weight: .semibold, design: .rounded))
                     .monospacedDigit()
                     .foregroundStyle(th.accent)
-                Text("W 输入")
+                Text(L("W 输入", "W input"))
                     .font(.system(size: fs(9)))
                     .foregroundStyle(th.sub)
                 Text(batteryText)
@@ -1246,25 +1265,25 @@ struct PowerCard: View {
             }
             HStack(spacing: 8) {
                 Circle().fill(th.accent).frame(width: 5, height: 5)
-                Text("输入").font(.system(size: fs(8.5))).foregroundStyle(th.sub)
+                Text(L("输入", "Input")).font(.system(size: fs(8.5))).foregroundStyle(th.sub)
                 Circle().fill(th.warn).frame(width: 5, height: 5)
-                Text("电池").font(.system(size: fs(8.5))).foregroundStyle(th.sub)
+                Text(L("电池", "Battery")).font(.system(size: fs(8.5))).foregroundStyle(th.sub)
                 Spacer()
-                Text("输入 平均 \(Int(avgW.rounded())) · 最高 \(Int(maxW.rounded())) W")
+                Text(L("输入 平均 \(Int(avgW.rounded())) · 最高 \(Int(maxW.rounded())) W", "Input avg \(Int(avgW.rounded())) · max \(Int(maxW.rounded())) W"))
                     .font(.system(size: fs(8.5)))
                     .foregroundStyle(th.sub)
             }
             PowerChartView(points: model.history, hours: model.chartHours)
             HStack {
-                Text(model.chartHours == 24 ? "24 小时前" : "\(model.chartHours) 小时前")
+                Text(model.chartHours == 24 ? L("24 小时前", "24h ago") : L("\(model.chartHours) 小时前", "\(model.chartHours)h ago"))
                     .font(.system(size: fs(8.5)))
                     .foregroundStyle(th.sub.opacity(0.7))
                 Spacer()
-                Text("现在")
+                Text(L("现在", "Now"))
                     .font(.system(size: fs(8.5)))
                     .foregroundStyle(th.sub.opacity(0.7))
             }
-            Text("每分钟采样 · \(pts.count) 个点")
+            Text(L("每分钟采样 · \(pts.count) 个点", "One sample/min · \(pts.count) points"))
                 .font(.system(size: fs(8.5)))
                 .foregroundStyle(th.sub.opacity(0.7))
         }
@@ -1273,7 +1292,7 @@ struct PowerCard: View {
     // 外观设置页
     private var appearanceTab: some View {
         VStack(alignment: .leading, spacing: 8 * sc) {
-            Text("主题")
+            Text(L("主题", "Theme"))
                 .font(.system(size: fs(10)))
                 .foregroundStyle(th.sub)
             HStack(spacing: 5 * sc) {
@@ -1289,7 +1308,7 @@ struct PowerCard: View {
                                     Circle().stroke(PWTheme.all[i].isLight ? Color.black.opacity(0.25) : Color.white.opacity(0.35),
                                                     lineWidth: model.themeIndex == i ? 2 : 0.6)
                                 )
-                            Text(PWTheme.all[i].name)
+                            Text(L(PWTheme.all[i].name, ["Black Gold", "Midnight", "Burgundy", "Forest", "Silver"][i]))
                                 .font(.system(size: fs(8.5)))
                                 .foregroundStyle(model.themeIndex == i ? th.accent : th.sub)
                         }
@@ -1300,7 +1319,7 @@ struct PowerCard: View {
                 }
             }
 
-            Text("字号")
+            Text(L("字号", "Font size"))
                 .font(.system(size: fs(10)))
                 .foregroundStyle(th.sub)
                 .padding(.top, 2 * sc)
@@ -1309,7 +1328,7 @@ struct PowerCard: View {
                     Button {
                         model.fontLevel = lv
                     } label: {
-                        Text(["小", "标准", "大", "特大"][lv - 1])
+                        Text([L("小", "Small"), L("标准", "Standard"), L("大", "Large"), L("特大", "XL")][lv - 1])
                             .font(.system(size: fs(9.5)))
                             .foregroundStyle(model.fontLevel == lv ? th.accent : th.sub)
                             .frame(maxWidth: .infinity)
@@ -1326,7 +1345,33 @@ struct PowerCard: View {
             .padding(3 * sc)
             .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(segBG))
 
-            Text("面板尺寸随字号同步缩放")
+            Text(L("语言", "Language"))
+                .font(.system(size: fs(10)))
+                .foregroundStyle(th.sub)
+                .padding(.top, 2 * sc)
+            HStack(spacing: 3) {
+                ForEach(0...2, id: \.self) { v in
+                    Button {
+                        model.language = v
+                    } label: {
+                        Text([L("跟随系统", "System"), "中文", "English"][v])
+                            .font(.system(size: fs(9.5)))
+                            .foregroundStyle(model.language == v ? th.accent : th.sub)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 4 * sc)
+                            .background(
+                                RoundedRectangle(cornerRadius: 6, style: .continuous)
+                                    .fill(model.language == v ? segFill : Color.clear)
+                            )
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+            .padding(3 * sc)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(segBG))
+
+            Text(L("面板尺寸随字号同步缩放", "Panel scales with font size"))
                 .font(.system(size: fs(8.5)))
                 .foregroundStyle(th.sub.opacity(0.7))
         }
@@ -1375,7 +1420,7 @@ struct PowerCard: View {
                     .font(.system(size: fs(10)))
                     .foregroundStyle(th.sub)
                 Spacer()
-                Text("\(model.age) 秒未变")
+                Text(L("\(model.age) 秒未变", "unchanged \(model.age)s"))
                     .font(.system(size: fs(9)))
                     .foregroundStyle(th.sub.opacity(0.65))
             }
@@ -1387,15 +1432,15 @@ struct PowerCard: View {
             }
             HStack(spacing: 8) {
                 if model.tab == 2 {
-                    smallButton(model.aiCleaning ? "AI 分析中…" : "AI 清理") {
+                    smallButton(model.aiCleaning ? L("AI 分析中…", "Analyzing…") : L("AI 清理", "AI Clean")) {
                         model.onAIClean()
                     }
                     .disabled(model.aiCleaning)
                 }
-                smallButton(model.launchAtLogin ? "开机自启 ✓" : "开机自启") {
+                smallButton(model.launchAtLogin ? L("开机自启 ✓", "Startup ✓") : L("开机自启", "Startup")) {
                     model.onToggleLaunchAtLogin()
                 }
-                Button("复制诊断") { model.onCopy() }
+                Button(L("复制诊断", "Copy info")) { model.onCopy() }
                     .buttonStyle(.plain)
                     .font(.system(size: fs(10.5), weight: .medium))
                     .foregroundStyle(th.accent)
@@ -1404,7 +1449,7 @@ struct PowerCard: View {
                     .overlay(Capsule().stroke(th.accentDim, lineWidth: 0.8))
                     .contentShape(Capsule())
                 Spacer()
-                Button("退出") { model.onQuit() }
+                Button(L("退出", "Quit")) { model.onQuit() }
                     .buttonStyle(.plain)
                     .font(.system(size: fs(10.5)))
                     .foregroundStyle(th.sub)
@@ -1419,7 +1464,7 @@ struct PowerCard: View {
         guard s.maxMAh > 0, s.battV > 0 else { return "—" }
         let maxWh = s.maxMAh * s.battV / 1000.0
         let curWh = s.remainMAh * s.battV / 1000.0
-        return String(format: "满 %.1f · 现 %.1f Wh", maxWh, curWh)
+        return L(String(format: "满 %.1f · 现 %.1f Wh", maxWh, curWh), String(format: "Full %.1f · Now %.1f Wh", maxWh, curWh))
     }
 
     private func identLine(_ s: Snapshot) -> String {
@@ -1431,7 +1476,7 @@ struct PowerCard: View {
         } else {
             t = "ID " + (s.adapterID.map { String(format: "0x%04X", $0) } ?? "—")
         }
-        if s.magsafePresent {
+        if s.magsafePresent && !appIsEnglish() {
             var m = "MagSafe"
             if let a = s.magsafeAuth { m += " 0x\(String(a, radix: 16))" }
             t += " · \(m)"
@@ -1442,13 +1487,13 @@ struct PowerCard: View {
     private func stateText() -> String {
         let s = model.snap
         var t = "\(s.soc)%"
-        if s.isCharging { t += " · 充电中" }
-        else if s.external { t += s.soc >= 100 ? " · 已充满" : " · 未充电" }
-        else { t += " · 放电中" }
+        if s.isCharging { t += L(" · 充电中", " · charging") }
+        else if s.external { t += s.soc >= 100 ? L(" · 已充满", " · full") : L(" · 未充电", " · not charging") }
+        else { t += L(" · 放电中", " · discharging") }
         if s.isCharging, let m = s.fullMin {
-            t += String(format: " · %d:%02d 后充满", m / 60, m % 60)
+            t += L(String(format: " · %d:%02d 后充满", m / 60, m % 60), String(format: " · %d:%02d to full", m / 60, m % 60))
         } else if let m = s.remainingMin {
-            t += String(format: " · %d:%02d 后耗尽", m / 60, m % 60)
+            t += L(String(format: " · %d:%02d 后耗尽", m / 60, m % 60), String(format: " · %d:%02d left", m / 60, m % 60))
         }
         return t
     }
@@ -1544,12 +1589,17 @@ final class PanelController {
     private func copyDiag() {
         let s = model.snap
         var lines: [String] = []
-        lines.append("PowerWatch 诊断 \(Date())")
-        lines.append(String(format: "输入 %.1f W  %.2f V × %.2f A", s.inputW, s.inputV, s.inputA))
-        lines.append(String(format: "电池 %+.1f W  %d%%  充电:%@", s.batteryW, s.soc, s.isCharging ? "是" : "否"))
-        lines.append(String(format: "电池容量 满 %.1f Wh / 现 %.1f Wh  设计 %.1f Wh",
-                            s.maxMAh * s.battV / 1000, s.remainMAh * s.battV / 1000, s.designMAh * s.battV / 1000))
-        lines.append(String(format: "CPU %.1f%%  内存 %.1f%% (%.1f/%.1f GB)", model.cpuPct, model.memPct, model.memUsed, model.memTotal))
+        lines.append(L("PowerWatch 诊断 \(Date())", "PowerWatch diagnostics \(Date())"))
+        lines.append(L(String(format: "输入 %.1f W  %.2f V × %.2f A", s.inputW, s.inputV, s.inputA),
+                        String(format: "Input %.1f W  %.2f V × %.2f A", s.inputW, s.inputV, s.inputA)))
+        lines.append(L(String(format: "电池 %+.1f W  %d%%  充电:%@", s.batteryW, s.soc, s.isCharging ? "是" : "否"),
+                        String(format: "Battery %+.1f W  %d%%  charging:%@", s.batteryW, s.soc, s.isCharging ? "yes" : "no")))
+        lines.append(L(String(format: "电池容量 满 %.1f Wh / 现 %.1f Wh  设计 %.1f Wh",
+                              s.maxMAh * s.battV / 1000, s.remainMAh * s.battV / 1000, s.designMAh * s.battV / 1000),
+                        String(format: "Capacity full %.1f Wh / now %.1f Wh  design %.1f Wh",
+                               s.maxMAh * s.battV / 1000, s.remainMAh * s.battV / 1000, s.designMAh * s.battV / 1000)))
+        lines.append(L(String(format: "CPU %.1f%%  内存 %.1f%% (%.1f/%.1f GB)", model.cpuPct, model.memPct, model.memUsed, model.memTotal),
+                        String(format: "CPU %.1f%%  Memory %.1f%% (%.1f/%.1f GB)", model.cpuPct, model.memPct, model.memUsed, model.memTotal)))
         let pb = NSPasteboard.general
         pb.clearContents()
         pb.setString(lines.joined(separator: "\n"), forType: .string)
@@ -1596,21 +1646,21 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             UserDefaults.standard.set(m.aiBase, forKey: "AIBase")
             UserDefaults.standard.set(m.aiModel, forKey: "AIModel")
             ConfigStore.saveKey(m.aiKey)
-            m.aiStatus = "已保存"
+            m.aiStatus = L("已保存", "Saved")
         }
         m.onTestConfig = { [weak self] in
             guard let self = self else { return }
             let m = self.controller.model
             guard !m.aiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
-                m.aiStatus = "请先填写 API Key"
+                m.aiStatus = L("请先填写 API Key", "Enter an API key first")
                 return
             }
-            m.aiStatus = "测试中…"
+            m.aiStatus = L("测试中…", "Testing…")
             let cfg = APIConfig(base: m.aiBase, model: m.aiModel, key: m.aiKey)
             self.client.chat(config: cfg, system: "你是连接测试助手。", user: "只回复 OK", maxTokens: 200) { result in
                 switch result {
-                case .success: m.aiStatus = "连接成功"
-                case .failure(let e): m.aiStatus = "失败：\(e.localizedDescription)"
+                case .success: m.aiStatus = L("连接成功", "Connected")
+                case .failure(let e): m.aiStatus = L("失败：", "Failed: ") + e.localizedDescription
                 }
                 self.controller.relayout()
             }
@@ -1620,23 +1670,23 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let m = self.controller.model
             guard !m.aiKey.trimmingCharacters(in: .whitespaces).isEmpty else {
                 m.tab = 3
-                m.aiStatus = "请先填写 API Key"
+                m.aiStatus = L("请先填写 API Key", "Enter an API key first")
                 self.controller.relayout()
                 return
             }
             guard !m.aiCleaning else { return }
             m.aiCleaning = true
             m.aiResult = nil
-            m.aiStatus = "AI 分析中…"
+            m.aiStatus = L("AI 分析中…", "AI analyzing…")
             let cfg = APIConfig(base: m.aiBase, model: m.aiModel, key: m.aiKey)
             self.aiCleaner.clean(config: cfg) { result in
                 m.aiCleaning = false
                 switch result {
                 case .success(let msg):
                     m.aiResult = msg
-                    m.aiStatus = "完成"
+                    m.aiStatus = L("完成", "Done")
                 case .failure(let e):
-                    m.aiStatus = "失败：\(e.localizedDescription)"
+                    m.aiStatus = L("失败：", "Failed: ") + e.localizedDescription
                 }
                 self.tick()
                 self.controller.relayout()
@@ -1649,7 +1699,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .enabled:
                 m.launchAtLogin = true
             case .requiresApproval:
-                m.loginMessage = "请在系统设置 > 登录项中允许 PowerWatch"
+                m.loginMessage = L("请在系统设置 > 登录项中允许 PowerWatch", "Allow PowerWatch in System Settings > Login Items")
             default:
                 break
             }
@@ -1664,7 +1714,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 }
                 self.removeLaunchAgent()
                 m.launchAtLogin = false
-                m.loginMessage = "已关闭开机自启"
+                m.loginMessage = L("已关闭开机自启", "Launch at login disabled")
                 self.controller.relayout()
                 return
             }
@@ -1677,10 +1727,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                     if st == .enabled {
                         self.removeLaunchAgent()
                         enabled = true
-                        m.loginMessage = "已开启开机自启"
+                        m.loginMessage = L("已开启开机自启", "Launch at login enabled")
                     } else if st == .requiresApproval {
                         needsApproval = true
-                        m.loginMessage = "请在系统设置 > 登录项中允许 PowerWatch"
+                        m.loginMessage = L("请在系统设置 > 登录项中允许 PowerWatch", "Allow PowerWatch in System Settings > Login Items")
                     }
                 } catch {
                     // fall through to the LaunchAgent fallback
@@ -1690,9 +1740,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                 do {
                     try self.installLaunchAgent()
                     enabled = true
-                    m.loginMessage = "已开启开机自启（LaunchAgent）"
+                    m.loginMessage = L("已开启开机自启（LaunchAgent）", "Launch at login enabled (LaunchAgent)")
                 } catch {
-                    m.loginMessage = "开机自启失败：\(error.localizedDescription)"
+                    m.loginMessage = L("开机自启失败：", "Failed to enable launch at login: ") + error.localizedDescription
                 }
             }
             m.launchAtLogin = enabled
@@ -1795,7 +1845,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc func tick() {
         tickCount += 1
         guard let s = reader.read() else {
-            statusItem.button?.title = " 读取失败"
+            statusItem.button?.title = L(" 读取失败", " Read failed")
             return
         }
 
