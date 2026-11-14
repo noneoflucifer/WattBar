@@ -1,5 +1,7 @@
 # PowerWatch
 
+**简体中文** | [English](README.en.md)
+
 **macOS 菜单栏里的电源与性能监视器。** 看充电器真实功率、PD 档位和适配器身份，也看 CPU / 内存和进程排行；还能用 DeepSeek 分析内存占用，安全清理可回收的后台进程。
 
 <p>
