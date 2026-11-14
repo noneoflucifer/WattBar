@@ -1,4 +1,4 @@
-# PowerWatch
+# WattBar
 
 [简体中文](README.md) | **English**
 
@@ -67,22 +67,22 @@
 
 ### Option 1: Download the built app
 
-1. Download `PowerWatch.zip` from [Releases](../../releases) and unzip it
-2. Drag `PowerWatch.app` into your Applications folder
+1. Download `WattBar.zip` from [Releases](../../releases) and unzip it
+2. Drag `WattBar.app` into your Applications folder
 3. The app is not notarized; on first launch **right-click → Open**, or run:
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/PowerWatch.app
-open /Applications/PowerWatch.app
+xattr -dr com.apple.quarantine /Applications/WattBar.app
+open /Applications/WattBar.app
 ```
 
 ### Option 2: Build from source
 
 ```bash
-git clone https://github.com/noneoflucifer/PowerWatch.git
-cd PowerWatch
+git clone https://github.com/noneoflucifer/WattBar.git
+cd WattBar
 ./build.sh
-open build/PowerWatch.app
+open build/WattBar.app
 ```
 
 ## Usage
@@ -98,7 +98,7 @@ open build/PowerWatch.app
 3. Paste your DeepSeek API key, click **Save** → **Test**
 4. Switch to the **Memory** tab and click **AI Clean**
 
-> The API key is stored only on your Mac at `~/Library/Application Support/PowerWatch/config.json` (mode 600, obfuscated). It is never uploaded anywhere.
+> The API key is stored only on your Mac at `~/Library/Application Support/WattBar/config.json` (mode 600, obfuscated). It is never uploaded anywhere.
 
 ## Privacy
 
@@ -119,7 +119,7 @@ macOS manages memory automatically, and third-party "memory cleaners" usually re
 ## Project structure
 
 ```
-PowerWatch.swift   # entire source (AppKit + SwiftUI)
+WattBar.swift   # entire source (AppKit + SwiftUI)
 Info.plist         # app metadata
 build.sh           # one-command build & bundle script
 ```

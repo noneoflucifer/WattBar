@@ -15,6 +15,19 @@ func appIsEnglish() -> Bool {
 }
 
 func L(_ zh: String, _ en: String) -> String { appIsEnglish() ? en : zh }
+
+enum AppPaths {
+    static let supportDir: URL = {
+        let base = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+        let newDir = base.appendingPathComponent("WattBar", isDirectory: true)
+        let oldDir = base.appendingPathComponent("PowerWatch", isDirectory: true)
+        if !FileManager.default.fileExists(atPath: newDir.path),
+           FileManager.default.fileExists(atPath: oldDir.path) {
+            try? FileManager.default.moveItem(at: oldDir, to: newDir)
+        }
+        return newDir
+    }()
+}
 import ServiceManagement
 import IOKit
 import IOKit.ps
@@ -150,8 +163,7 @@ final class HistoryStore {
     private var migrated = false
 
     private init() {
-        let dir = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PowerWatch", isDirectory: true)
+        let dir = AppPaths.supportDir
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         file = dir.appendingPathComponent("history.jsonl")
         let legacy = dir.appendingPathComponent("history.json")
@@ -452,7 +464,7 @@ final class ProcessSampler {
     private func aggregate(_ raw: [(Int, String, Double)]) -> [ProcItem] {
         var sums: [String: Double] = [:]
         for (_, n, v) in raw {
-            if n == "PowerWatch" || n == "ps" || n == "top" || n.hasPrefix("top") { continue }
+            if n == "WattBar" || n == "PowerWatch" || n == "ps" || n == "top" || n.hasPrefix("top") { continue }
             sums[n, default: 0] += v
         }
         return sums.map { ProcItem(id: abs($0.key.hashValue), name: $0.key, value: $0.value) }
@@ -492,8 +504,7 @@ final class ProcessSampler {
 
 enum ConfigStore {
     private static var dir: URL {
-        FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            .appendingPathComponent("PowerWatch", isDirectory: true)
+        AppPaths.supportDir
     }
     private static var file: URL { dir.appendingPathComponent("config.json") }
 
@@ -609,7 +620,7 @@ final class AICleaner {
         "mdsync", "Spotlight", "secd", "apsd", "bluetoothd", "sharingd", "rapportd",
         "identityservicesd", "nsurlsessiond", "cloudd", "bird", "fileproviderd",
         "UserEventAgent", "watchdogd", "logd", "syslogd", "opendirectoryd", "diskarbitrationd",
-        "PowerWatch"
+        "WattBar", "PowerWatch"
     ]
 
     func clean(config: APIConfig, completion: @escaping (Result<String, Error>) -> Void) {
@@ -1589,7 +1600,7 @@ final class PanelController {
     private func copyDiag() {
         let s = model.snap
         var lines: [String] = []
-        lines.append(L("PowerWatch 诊断 \(Date())", "PowerWatch diagnostics \(Date())"))
+        lines.append(L("WattBar 诊断 \(Date())", "WattBar diagnostics \(Date())"))
         lines.append(L(String(format: "输入 %.1f W  %.2f V × %.2f A", s.inputW, s.inputV, s.inputA),
                         String(format: "Input %.1f W  %.2f V × %.2f A", s.inputW, s.inputV, s.inputA)))
         lines.append(L(String(format: "电池 %+.1f W  %d%%  充电:%@", s.batteryW, s.soc, s.isCharging ? "是" : "否"),
@@ -1699,7 +1710,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             case .enabled:
                 m.launchAtLogin = true
             case .requiresApproval:
-                m.loginMessage = L("请在系统设置 > 登录项中允许 PowerWatch", "Allow PowerWatch in System Settings > Login Items")
+                m.loginMessage = L("请在系统设置 > 登录项中允许 WattBar", "Allow WattBar in System Settings > Login Items")
             default:
                 break
             }
@@ -1730,7 +1741,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                         m.loginMessage = L("已开启开机自启", "Launch at login enabled")
                     } else if st == .requiresApproval {
                         needsApproval = true
-                        m.loginMessage = L("请在系统设置 > 登录项中允许 PowerWatch", "Allow PowerWatch in System Settings > Login Items")
+                        m.loginMessage = L("请在系统设置 > 登录项中允许 WattBar", "Allow WattBar in System Settings > Login Items")
                     }
                 } catch {
                     // fall through to the LaunchAgent fallback
@@ -1807,7 +1818,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
         let dict: [String: Any] = [
             "Label": "local.yt.powerwatch",
-            "ProgramArguments": ["/Applications/PowerWatch.app/Contents/MacOS/PowerWatch"],
+            "ProgramArguments": ["/Applications/WattBar.app/Contents/MacOS/WattBar"],
             "RunAtLoad": true,
             "ProcessType": "Interactive"
         ]

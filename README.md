@@ -1,4 +1,4 @@
-# PowerWatch
+# WattBar
 
 **简体中文** | [English](README.en.md)
 
@@ -62,22 +62,22 @@
 
 ### 方式一：下载构建好的 App
 
-1. 从 [Releases](../../releases) 下载 `PowerWatch.zip` 并解压
-2. 把 `PowerWatch.app` 拖进「应用程序」
+1. 从 [Releases](../../releases) 下载 `WattBar.zip` 并解压
+2. 把 `WattBar.app` 拖进「应用程序」
 3. 因为未做 Apple 公证，首次打开请 **右键 → 打开**，或在终端执行：
 
 ```bash
-xattr -dr com.apple.quarantine /Applications/PowerWatch.app
-open /Applications/PowerWatch.app
+xattr -dr com.apple.quarantine /Applications/WattBar.app
+open /Applications/WattBar.app
 ```
 
 ### 方式二：从源码编译
 
 ```bash
-git clone https://github.com/noneoflucifer/PowerWatch.git
-cd PowerWatch
+git clone https://github.com/noneoflucifer/WattBar.git
+cd WattBar
 ./build.sh
-open build/PowerWatch.app
+open build/WattBar.app
 ```
 
 ## 使用
@@ -93,7 +93,7 @@ open build/PowerWatch.app
 3. 填入你的 DeepSeek API Key，点「保存」→「测试连接」
 4. 切到「内存」页，点「AI 清理」
 
-> API Key 只保存在本机 `~/Library/Application Support/PowerWatch/config.json`（权限 600，做了混淆编码），不会上传到任何地方。
+> API Key 只保存在本机 `~/Library/Application Support/WattBar/config.json`（权限 600，做了混淆编码），不会上传到任何地方。
 
 ## 隐私
 
@@ -114,7 +114,7 @@ macOS 的内存管理由系统自动完成，第三方「清理内存」的收�
 ## 项目结构
 
 ```
-PowerWatch.swift   # 全部源码（AppKit + SwiftUI）
+WattBar.swift   # 全部源码（AppKit + SwiftUI）
 Info.plist         # App 元数据
 build.sh           # 一键编译打包脚本
 ```
@@ -133,6 +133,6 @@ build.sh           # 一键编译打包脚本
 
 ## English
 
-**PowerWatch** is a lightweight macOS menu bar monitor: real charger wattage, USB-PD contract, adapter identity, battery capacity in Wh, CPU/memory usage with top processes, AI-assisted memory cleanup via DeepSeek, and a persistent charging curve with 1h/6h/24h views. Five themes, four font sizes, all local by default.
+**WattBar** is a lightweight macOS menu bar monitor: real charger wattage, USB-PD contract, adapter identity, battery capacity in Wh, CPU/memory usage with top processes, AI-assisted memory cleanup via DeepSeek, and a persistent charging curve with 1h/6h/24h views. Five themes, four font sizes, all local by default.
 
-Build with `./build.sh` (requires Xcode Command Line Tools), then `open build/PowerWatch.app`.
+Build with `./build.sh` (requires Xcode Command Line Tools), then `open build/WattBar.app`.
